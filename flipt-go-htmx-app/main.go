@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,7 +15,7 @@ const (
 )
 
 func evaluateFeature(fliptURL string) (bool, error) {
-	url := fmt.Sprintf("%s/evaluate", fliptURL)
+	url := fmt.Sprintf("%s/api/v1/evaluate", fliptURL)
 	payload := map[string]interface{}{
 		"flagKey":  flagKey,
 		"entityId": entityID,
@@ -25,7 +26,10 @@ func evaluateFeature(fliptURL string) (bool, error) {
 		return false, fmt.Errorf("failed to marshal JSON payload: %w", err)
 	}
 
-	resp, err := http.Post(url, "application/json", &payloadBytes)
+	// Create a bytes.Buffer from the byte slice
+	body := bytes.NewBuffer(payloadBytes)
+
+	resp, err := http.Post(url, "application/json", body)
 	if err != nil {
 		return false, fmt.Errorf("failed to make request to Flipt: %w", err)
 	}
@@ -38,7 +42,8 @@ func evaluateFeature(fliptURL string) (bool, error) {
 	var evaluation struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&evaluation); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&evaluation)
+	if err != nil {
 		return false, fmt.Errorf("failed to decode Flipt response: %w", err)
 	}
 
@@ -47,14 +52,15 @@ func evaluateFeature(fliptURL string) (bool, error) {
 
 func featureHandler(w http.ResponseWriter, r *http.Request) {
 	fliptURL := os.Getenv("FLIPT_URL")
-	if fliptURL == "" {
+	if (fliptURL == "") {
 		fliptURL = defaultFliptURL
 	}
 
 	enabled, err := evaluateFeature(fliptURL)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error checking feature: %v", err)
+		w.WriteHeader(http.StatusOK)
+		// Show error in the UI for easier debugging
+		fmt.Fprintf(w, `<div id="feature-status" style="color:red;">Error: %v</div>`, err)
 		return
 	}
 

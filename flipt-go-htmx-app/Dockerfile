@@ -2,7 +2,7 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN go mod download
 
 COPY . .
@@ -15,6 +15,6 @@ WORKDIR /app
 
 COPY --from=builder /app/flipt-go-htmx-app .
 
-EXPOSE 8081
+EXPOSE 8080
 
 CMD ["./flipt-go-htmx-app"]
