@@ -1,0 +1,20 @@
+# Go
+/flipt-go-htmx-app/flipt-go-htmx-app
+/flipt-go-htmx-app/*.exe
+/flipt-go-htmx-app/*.test
+/flipt-go-htmx-app/coverage.out
+
+# Docker
+**/.docker*
+**/Dockerfile*
+
+# Kubernetes
+*.yaml~
+*.bak
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store

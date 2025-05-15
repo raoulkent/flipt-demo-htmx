@@ -60,6 +60,7 @@ func evaluateFeature(fliptURL string) (string, error) {
 
 // Change featureHandler to return JSON for status and color
 func featureHandler(w http.ResponseWriter, r *http.Request) {
+	// Get Flipt URL from env or use default
 	fliptURL := os.Getenv("FLIPT_URL")
 	if fliptURL == "" {
 		fliptURL = defaultFliptURL
@@ -70,21 +71,27 @@ func featureHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
-			"status": "ERROR",
-			"color": "red",
+			"status":  "ERROR",
+			"color":   "red",
+			"warning": err.Error(),
 		})
 		return
 	}
 	status := "DISABLED"
 	color := "red"
+	warning := ""
 	if value == "true" {
 		status = "ENABLED"
 		color = "green"
+	} else if value != "false" {
+		// Edge case: unexpected value
+		warning = "Unexpected flag value: '" + value + "' (expected 'true' or 'false'). Feature is treated as DISABLED."
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"status": status,
-		"color": color,
+		"status":  status,
+		"color":   color,
+		"warning": warning,
 	})
 }
 
@@ -122,6 +129,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 				fetch('/feature-status').then(r => r.json()).then(data => {
 					const status = data.status;
 					const color = data.color;
+					const warning = data.warning || "";
 					const now = new Date().toLocaleTimeString();
 					if (lastStatus !== status) {
 						var row = document.createElement('tr');
@@ -135,6 +143,21 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 						lastStatus = status;
 					}
 					document.getElementById('feature-status').innerHTML = '<span style="color:' + color + ';">Feature is <b>' + status + '</b></span>';
+					const warnDiv = document.getElementById('feature-warning');
+					if (warning) {
+						if (!warnDiv) {
+							const div = document.createElement('div');
+							div.id = 'feature-warning';
+							div.style.color = 'orange';
+							div.style.marginTop = '1em';
+							div.textContent = warning;
+							document.body.insertBefore(div, document.getElementById('feature-status-log'));
+						} else {
+							warnDiv.textContent = warning;
+						}
+					} else if (warnDiv) {
+						warnDiv.remove();
+					}
 				});
 			}
 			pollStatus();

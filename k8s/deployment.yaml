@@ -22,6 +22,13 @@ spec:
           env:
             - name: FLIPT_URL
               value: http://flipt:8080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
 ---
 apiVersion: apps/v1
 kind: Deployment

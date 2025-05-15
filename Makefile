@@ -6,7 +6,7 @@ SHELL := /bin/bash
 minikube-docker-env:
 	eval $$(minikube docker-env)
 
-.PHONY: all build deploy redeploy clean port-forward
+.PHONY: all build deploy redeploy clean port-forward port-forward-flipt urls logs help
 
 all: build deploy
 
@@ -45,3 +45,13 @@ urls:
 	minikube service flipt --url
 	@echo "Go HTMX app URL:"
 	minikube service flipt-go-htmx-app-service --url
+
+# View Go app logs
+logs:
+	kubectl logs deployment/flipt-go-htmx-app -f
+
+# Show all Makefile targets
+help:
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-24s %s\n", $$1, $$2}'
+	@echo "\nCommon targets: all, build, deploy, redeploy, clean, port-forward, port-forward-flipt, urls, logs, help"

@@ -2,6 +2,8 @@
 
 This repository demonstrates a simple Go web app using HTMX, integrated with Flipt for feature flagging, running locally on Kubernetes via Minikube.
 
+![Screenshot](docs/screenshot.png)
+
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
@@ -114,11 +116,18 @@ curl -X POST http://localhost:8080/api/v1/flags/my_awesome_feature/rules \
   }'
 ```
 
-> **Important:** This creates a *variant* flag, not a Boolean flag. The Go app will treat the variant value as a string ("true" or "false").
+> **Important:** This creates a *variant* flag, not a Boolean flag. The Go app will treat the variant value as a string ("true" or "false"). Any other value will be treated as disabled and a warning will be shown in the UI.
 >
 > For true Boolean flag support (with Flipt's Boolean flag type and rollouts), use the UI as described in Option A.
 
 After running these commands, refresh the Go HTMX app page to see the flag status update.
+
+## App Behavior
+
+- The Go app polls the Flipt API every second and displays the feature status in a live, scrolling log with timestamps.
+- The current status is always shown at the top right of the page.
+- A new log entry is only added when the status changes.
+- If the Flipt API returns a value other than "true" or "false", a warning is shown in the UI.
 
 ## Development
 
@@ -145,10 +154,20 @@ make clean
 ## Makefile Targets
 
 - `make all` - Build, deploy, and set up everything
-- `make redeploy` - Rebuild and redeploy the Go app
+- `make redeploy` - Rebuild and redeploy the Go app (restarts the deployment to ensure the latest code is running)
 - `make clean` - Remove all Kubernetes resources
 - `make port-forward` - Port-forward the Go app to localhost:8081
+- `make port-forward-flipt` - Port-forward Flipt dashboard to localhost:8080
+- `make urls` - Print service URLs
+- `make logs` - View Go app logs
+- `make help` - Show all Makefile targets
 
 ---
 
-For more, see the comments in the Makefile.
+## Contributing
+
+Pull requests and issues are welcome! For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
