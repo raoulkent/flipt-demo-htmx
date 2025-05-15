@@ -14,7 +14,8 @@ const (
 	entityID        = "user123"
 )
 
-func evaluateFeature(fliptURL string) (bool, error) {
+// Evaluate the feature flag, supporting both Boolean and variant flags
+func evaluateFeature(fliptURL string) (string, error) {
 	url := fmt.Sprintf("%s/api/v1/evaluate", fliptURL)
 	payload := map[string]interface{}{
 		"flagKey":  flagKey,
@@ -23,55 +24,86 @@ func evaluateFeature(fliptURL string) (bool, error) {
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return false, fmt.Errorf("failed to marshal JSON payload: %w", err)
+		return "error", fmt.Errorf("failed to marshal JSON payload: %w", err)
 	}
 
-	// Create a bytes.Buffer from the byte slice
 	body := bytes.NewBuffer(payloadBytes)
 
 	resp, err := http.Post(url, "application/json", body)
 	if err != nil {
-		return false, fmt.Errorf("failed to make request to Flipt: %w", err)
+		return "error", fmt.Errorf("failed to make request to Flipt: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("Flipt returned non-OK status: %d", resp.StatusCode)
+		return "error", fmt.Errorf("Flipt returned non-OK status: %d", resp.StatusCode)
 	}
 
-	var evaluation struct {
-		Enabled bool `json:"enabled"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&evaluation)
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode Flipt response: %w", err)
+		return "error", fmt.Errorf("failed to decode Flipt response: %w", err)
 	}
 
-	return evaluation.Enabled, nil
+	// Prefer 'enabled' (Boolean flag), else use 'value' (variant flag)
+	if enabled, ok := result["enabled"].(bool); ok {
+		if enabled {
+			return "true", nil
+		}
+		return "false", nil
+	}
+	if value, ok := result["value"].(string); ok {
+		return value, nil
+	}
+	return "error", fmt.Errorf("Flipt response missing 'enabled' and 'value'")
 }
 
 func featureHandler(w http.ResponseWriter, r *http.Request) {
 	fliptURL := os.Getenv("FLIPT_URL")
-	if (fliptURL == "") {
+	if fliptURL == "" {
 		fliptURL = defaultFliptURL
 	}
 
-	enabled, err := evaluateFeature(fliptURL)
+	value, err := evaluateFeature(fliptURL)
 	if err != nil {
 		w.WriteHeader(http.StatusOK)
-		// Show error in the UI for easier debugging
 		fmt.Fprintf(w, `<div id="feature-status" style="color:red;">Error: %v</div>`, err)
 		return
 	}
 
-	fmt.Fprintf(w, `<div id="feature-status">%s</div>`, renderFeatureStatus(enabled))
+	// Log state changes with timestamp in the browser (using JS)
+	fmt.Fprintf(w, renderFeatureStatusJS(value))
 }
 
-func renderFeatureStatus(enabled bool) string {
-	if enabled {
-		return `<span style="color: green;">Feature is <b hx-swap="outerHTML" hx-get="/feature-status" hx-trigger="every 2s">ENABLED</b></span>`
+// Returns a script and log table, appends a new row only if state changed
+func renderFeatureStatusJS(value string) string {
+	color := "red"
+	status := "DISABLED"
+	if value == "true" {
+		color = "green"
+		status = "ENABLED"
 	}
-	return `<span style="color: red;">Feature is <b hx-swap="outerHTML" hx-get="/feature-status" hx-trigger="every 2s">DISABLED</b></span>`
+	return fmt.Sprintf(`
+<div id="feature-status-log">
+	<table id="status-log-table" style="width:100%%;border-collapse:collapse;">
+		<thead><tr><th style='text-align:left;'>Time</th><th>Status</th></tr></thead>
+		<tbody id="status-log-body"></tbody>
+	</table>
+</div>
+<script>
+(function() {
+	var lastStatus = window.lastFeatureStatus;
+	var newStatus = "%s";
+	if (lastStatus !== newStatus) {
+		var now = new Date().toLocaleTimeString();
+		var row = '<tr><td>' + now + '</td><td style="color:%s;"><b>' + newStatus + '</b></td></tr>';
+		document.getElementById('status-log-body').insertAdjacentHTML('beforeend', row);
+		window.lastFeatureStatus = newStatus;
+	}
+})();
+</script>
+<span style="color: %s;">Feature is <b>%s</b></span>
+`, status, color, color, status)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
