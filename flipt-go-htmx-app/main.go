@@ -58,6 +58,7 @@ func evaluateFeature(fliptURL string) (string, error) {
 	return "error", fmt.Errorf("Flipt response missing 'enabled' and 'value'")
 }
 
+// Change featureHandler to return JSON for status and color
 func featureHandler(w http.ResponseWriter, r *http.Request) {
 	fliptURL := os.Getenv("FLIPT_URL")
 	if fliptURL == "" {
@@ -66,44 +67,25 @@ func featureHandler(w http.ResponseWriter, r *http.Request) {
 
 	value, err := evaluateFeature(fliptURL)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `<div id="feature-status" style="color:red;">Error: %v</div>`, err)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "ERROR",
+			"color": "red",
+		})
 		return
 	}
-
-	// Log state changes with timestamp in the browser (using JS)
-	fmt.Fprintf(w, renderFeatureStatusJS(value))
-}
-
-// Returns a script and log table, appends a new row only if state changed
-func renderFeatureStatusJS(value string) string {
-	color := "red"
 	status := "DISABLED"
+	color := "red"
 	if value == "true" {
-		color = "green"
 		status = "ENABLED"
+		color = "green"
 	}
-	return fmt.Sprintf(`
-<div id="feature-status-log">
-	<table id="status-log-table" style="width:100%%;border-collapse:collapse;">
-		<thead><tr><th style='text-align:left;'>Time</th><th>Status</th></tr></thead>
-		<tbody id="status-log-body"></tbody>
-	</table>
-</div>
-<script>
-(function() {
-	var lastStatus = window.lastFeatureStatus;
-	var newStatus = "%s";
-	if (lastStatus !== newStatus) {
-		var now = new Date().toLocaleTimeString();
-		var row = '<tr><td>' + now + '</td><td style="color:%s;"><b>' + newStatus + '</b></td></tr>';
-		document.getElementById('status-log-body').insertAdjacentHTML('beforeend', row);
-		window.lastFeatureStatus = newStatus;
-	}
-})();
-</script>
-<span style="color: %s;">Feature is <b>%s</b></span>
-`, status, color, color, status)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": status,
+		"color": color,
+	})
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -113,14 +95,51 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	<head>
 		<title>Flipt Demo</title>
 		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+		<style>
+			body { background: #18191a; color: #f5f6fa; font-family: sans-serif; }
+			table { background: #232526; }
+			#status-log-table { max-height: 300px; overflow-y: auto; display: block; }
+			.header-row { display: flex; align-items: center; margin-bottom: 1.5em; }
+			.header-title { font-size: 2.5em; font-weight: bold; margin-right: 1.5em; }
+			#feature-status { font-size: 1.5em; margin-left: 1em; }
+		</style>
 	</head>
 	<body>
-		<h1>Feature Flag Status</h1>
-		<div id="feature-status">Loading...</div>
+		<div class="header-row">
+			<span class="header-title">Feature Flag Status</span>
+			<span id="feature-status"></span>
+		</div>
+		<div id="feature-status-log">
+			<table id="status-log-table" style="width:100%;border-collapse:collapse;">
+				<thead><tr><th style='text-align:left;'>Time</th><th>Status</th></tr></thead>
+				<tbody id="status-log-body"></tbody>
+			</table>
+		</div>
 		<script>
-			document.addEventListener('DOMContentLoaded', function() {
-				htmx.ajax('GET', '/feature-status', '#feature-status');
-			});
+		(function() {
+			let lastStatus = null;
+			function pollStatus() {
+				fetch('/feature-status').then(r => r.json()).then(data => {
+					const status = data.status;
+					const color = data.color;
+					const now = new Date().toLocaleTimeString();
+					if (lastStatus !== status) {
+						var row = document.createElement('tr');
+						row.appendChild(Object.assign(document.createElement('td'), {textContent: now}));
+						var statusCell = document.createElement('td');
+						statusCell.style.color = color;
+						statusCell.innerHTML = '<b>' + status + '</b>';
+						row.appendChild(statusCell);
+						document.getElementById('status-log-body').appendChild(row);
+						row.scrollIntoView({behavior: 'smooth', block: 'end'});
+						lastStatus = status;
+					}
+					document.getElementById('feature-status').innerHTML = '<span style="color:' + color + ';">Feature is <b>' + status + '</b></span>';
+				});
+			}
+			pollStatus();
+			setInterval(pollStatus, 1000);
+		})();
 		</script>
 	</body>
 	</html>
