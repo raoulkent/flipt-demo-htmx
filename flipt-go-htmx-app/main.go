@@ -10,8 +10,8 @@ import (
 
 const (
 	defaultFliptURL = "http://flipt:8080"
-	flagKey         = "my_awesome_feature" // Boolean flag
-	colorFlagKey    = "color_box"          // Variant flag for color
+	flagKey         = "feature_toggle" // Boolean flag for enabling/disabling the feature
+	colorFlagKey    = "color_box"      // Variant flag for color
 	entityID        = "user123"
 )
 

@@ -58,7 +58,7 @@ You can use the Flipt dashboard UI or the Flipt API via `curl` to create and con
 
 1. Open the Flipt dashboard (see above).
 2. Click **Flags** in the sidebar, then click **Create Flag**.
-3. Enter the key `my_awesome_feature` (must match exactly, case-sensitive).
+3. Enter the key `feature_toggle` (must match exactly, case-sensitive).
 4. Choose **Boolean** as the flag type and fill in the required fields (name, description, etc.).
 5. Enable the flag (toggle ON).
 6. (Optional) To do a percentage rollout, go to the **Rollouts** tab for the flag and add a Threshold rollout (e.g., 50% true, 50% false).
@@ -67,15 +67,15 @@ You can use the Flipt dashboard UI or the Flipt API via `curl` to create and con
 
 #### Option B: Using curl (API) — Boolean Flag
 
-To create a Boolean flag named `my_awesome_feature` via the Flipt API:
+To create a Boolean flag named `feature_toggle` via the Flipt API:
 
 ```sh
 curl -X POST http://localhost:8080/api/v1/namespaces/default/flags \
   -H 'Content-Type: application/json' \
   -d '{
-    "key": "my_awesome_feature",
-    "name": "My Awesome Feature",
-    "description": "Demo boolean feature flag created via API",
+    "key": "feature_toggle",
+    "name": "Feature Toggle",
+    "description": "Controls whether the demo feature is enabled or disabled",
     "enabled": true,
     "type": "BOOLEAN_FLAG_TYPE"
   }'
@@ -84,11 +84,11 @@ curl -X POST http://localhost:8080/api/v1/namespaces/default/flags \
 To enable or disable the flag (update):
 
 ```sh
-curl -X PUT http://localhost:8080/api/v1/namespaces/default/flags/my_awesome_feature \
+curl -X PUT http://localhost:8080/api/v1/namespaces/default/flags/feature_toggle \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "My Awesome Feature",
-    "description": "Demo boolean feature flag created via API",
+    "name": "Feature Toggle",
+    "description": "Controls whether the demo feature is enabled or disabled",
     "enabled": true,
     "type": "BOOLEAN_FLAG_TYPE"
   }'
