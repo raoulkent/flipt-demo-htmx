@@ -10,7 +10,8 @@ import (
 
 const (
 	defaultFliptURL = "http://flipt:8080"
-	flagKey         = "my_awesome_feature" // Replace with your flag key
+	flagKey         = "my_awesome_feature" // Boolean flag
+	colorFlagKey    = "color_box"          // Variant flag for color
 	entityID        = "user123"
 )
 
@@ -19,9 +20,9 @@ func evaluateFeature(fliptURL string) (string, error) {
 	url := fmt.Sprintf("%s/evaluate/v1/boolean", fliptURL)
 	payload := map[string]interface{}{
 		"namespaceKey": "default",
-		"flagKey":  flagKey,
-		"entityId": entityID,
-		"context":  map[string]interface{}{},
+		"flagKey":      flagKey,
+		"entityId":     entityID,
+		"context":      map[string]interface{}{},
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -54,6 +55,39 @@ func evaluateFeature(fliptURL string) (string, error) {
 	return "false", nil
 }
 
+// Evaluate the color variant flag
+func evaluateColor(fliptURL string) (string, error) {
+	url := fmt.Sprintf("%s/evaluate/v1/variant", fliptURL)
+	payload := map[string]interface{}{
+		"namespaceKey": "default",
+		"flagKey":      colorFlagKey,
+		"entityId":     entityID,
+		"context":      map[string]interface{}{},
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "#888888", fmt.Errorf("failed to marshal JSON payload: %w", err)
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return "#888888", fmt.Errorf("failed to make request to Flipt: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "#888888", fmt.Errorf("Flipt returned non-OK status: %d", resp.StatusCode)
+	}
+	var result struct {
+		VariantKey string `json:"variantKey"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "#888888", fmt.Errorf("failed to decode Flipt response: %w", err)
+	}
+	if result.VariantKey != "" {
+		return result.VariantKey, nil
+	}
+	return "#888888", nil // fallback color
+}
+
 // Change featureHandler to return JSON for status and color
 func featureHandler(w http.ResponseWriter, r *http.Request) {
 	// Get Flipt URL from env or use default
@@ -83,11 +117,13 @@ func featureHandler(w http.ResponseWriter, r *http.Request) {
 		// Edge case: unexpected value
 		warning = "Unexpected flag value: '" + value + "' (expected 'true' or 'false'). Feature is treated as DISABLED."
 	}
+	color, _ = evaluateColor(fliptURL) // ignore error, fallback handled
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":  status,
-		"color":   color,
-		"warning": warning,
+		"status":   status,
+		"color":    color,
+		"warning":  warning,
+		"boxColor": color,
 	})
 }
 
@@ -105,12 +141,14 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 			.header-row { display: flex; align-items: center; margin-bottom: 1.5em; }
 			.header-title { font-size: 2.5em; font-weight: bold; margin-right: 1.5em; }
 			#feature-status { font-size: 1.5em; margin-left: 1em; }
+			#color-box { width: 40px; height: 40px; border-radius: 8px; display: inline-block; margin-left: 2em; border: 2px solid #444; vertical-align: middle; }
 		</style>
 	</head>
 	<body>
 		<div class="header-row">
 			<span class="header-title">Feature Flag Status</span>
 			<span id="feature-status"></span>
+			<span id="color-box"></span>
 		</div>
 		<div id="feature-status-log">
 			<table id="status-log-table" style="width:100%;border-collapse:collapse;">
@@ -121,11 +159,13 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		<script>
 		(function() {
 			let lastStatus = null;
+			let lastBoxColor = null;
 			function pollStatus() {
 				fetch('/feature-status').then(r => r.json()).then(data => {
 					const status = data.status;
 					const color = data.color;
 					const warning = data.warning || "";
+					const boxColor = data.boxColor || "#888888";
 					const now = new Date().toLocaleTimeString();
 					if (lastStatus !== status) {
 						var row = document.createElement('tr');
@@ -154,6 +194,10 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 					} else if (warnDiv) {
 						warnDiv.remove();
 					}
+					if (lastBoxColor !== boxColor) {
+						document.getElementById('color-box').style.background = boxColor;
+						lastBoxColor = boxColor;
+					}
 				});
 			}
 			pollStatus();
@@ -163,7 +207,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	</body>
 	</html>
 	`
-	fmt.Fprintf(w, html)
+	fmt.Fprint(w, html)
 }
 
 func main() {

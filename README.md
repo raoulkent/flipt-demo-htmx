@@ -98,6 +98,65 @@ curl -X PUT http://localhost:8080/api/v1/namespaces/default/flags/my_awesome_fea
 
 After running these commands, refresh the Go HTMX app page to see the flag status update.
 
+### 6. (Optional) Add a Color Box Variant Flag
+
+You can use a Flipt variant flag to control the color of the box in the UI. The Go app will use the variant key as a CSS color (e.g., `#ff0000`, `#00ff00`, `#3498db`, etc.).
+
+#### Create the color_box variant flag via API:
+
+```sh
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "key": "color_box",
+    "name": "Color Box",
+    "description": "Controls the color of the box in the UI",
+    "enabled": true,
+    "type": "VARIANT_FLAG_TYPE"
+  }'
+```
+
+Add color variants (e.g., red, green, blue, or hex codes):
+
+```sh
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags/color_box/variants \
+  -H 'Content-Type: application/json' \
+  -d '{"key": "#ff0000", "name": "Red", "description": "Red box"}'
+
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags/color_box/variants \
+  -H 'Content-Type: application/json' \
+  -d '{"key": "#00ff00", "name": "Green", "description": "Green box"}'
+
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags/color_box/variants \
+  -H 'Content-Type: application/json' \
+  -d '{"key": "#3498db", "name": "Blue", "description": "Blue box"}'
+```
+
+Create a `default` segment (if it does not already exist):
+
+```sh
+curl -X POST http://localhost:8080/api/v1/namespaces/default/segments \
+  -H 'Content-Type: application/json' \
+  -d '{"key": "default", "name": "Default", "description": "Default segment for all users", "matchType": "ALL_MATCH_TYPE"}'
+```
+
+Add a rule to serve a color to all users (e.g., blue):
+
+```sh
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags/color_box/rules \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "type": "multi",
+    "distributions": [{"variantKey": "#3498db", "rollout": 100}],
+    "segmentKeys": ["default"],
+    "rank": 1
+  }'
+```
+
+> **Tip:** You can change the color by updating the rule's `variantKey` to another color value.
+
+After running these commands, refresh the Go HTMX app page to see the color box update.
+
 ## App Behavior
 
 - The Go app polls the Flipt API every second and displays the feature status in a live, scrolling log with timestamps.
