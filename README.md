@@ -52,73 +52,49 @@ This will:
 
 ### 5. Configure Feature Flags
 
-You can use the Flipt dashboard UI (recommended) or the Flipt API via `curl` to create and configure the feature flag.
+You can use the Flipt dashboard UI or the Flipt API via `curl` to create and configure the Boolean feature flag.
 
-#### Option A: Using the Flipt Dashboard (UI) — Recommended for Boolean Flags
+#### Option A: Using the Flipt Dashboard (UI)
 
 1. Open the Flipt dashboard (see above).
 2. Click **Flags** in the sidebar, then click **Create Flag**.
 3. Enter the key `my_awesome_feature` (must match exactly, case-sensitive).
 4. Choose **Boolean** as the flag type and fill in the required fields (name, description, etc.).
 5. Enable the flag (toggle ON).
-6. **No variants or targeting rules are needed.**
-7. (Optional) To do a percentage rollout, go to the **Rollouts** tab for the flag and add a Threshold rollout (e.g., 50% true, 50% false).
-8. The flag is now enabled for all users by default.
-9. Refresh the Go HTMX app page to see the flag status update.
+6. (Optional) To do a percentage rollout, go to the **Rollouts** tab for the flag and add a Threshold rollout (e.g., 50% true, 50% false).
+7. The flag is now enabled for all users by default.
+8. Refresh the Go HTMX app page to see the flag status update.
 
-#### Option B: Using curl (API) — For Variant Flags Only
+#### Option B: Using curl (API) — Boolean Flag
 
-> **Note:** The Flipt API (v1) does not support creating true Boolean flags via curl or the API. The API method below creates a *variant* flag, which is not the same as a Boolean flag in Flipt. For Boolean flags, always use the UI (see Option A above).
-
-To create a *variant* flag named `my_awesome_feature` via the Flipt API:
+To create a Boolean flag named `my_awesome_feature` via the Flipt API:
 
 ```sh
-curl -X POST http://localhost:8080/api/v1/flags \
+curl -X POST http://localhost:8080/api/v1/namespaces/default/flags \
   -H 'Content-Type: application/json' \
   -d '{
     "key": "my_awesome_feature",
     "name": "My Awesome Feature",
-    "description": "Demo feature flag created via API (variant flag)",
-    "enabled": true
+    "description": "Demo boolean feature flag created via API",
+    "enabled": true,
+    "type": "BOOLEAN_FLAG_TYPE"
   }'
 ```
 
-Add the `true` and `false` variants (these are just string values, not Boolean types):
+To enable or disable the flag (update):
 
 ```sh
-curl -X POST http://localhost:8080/api/v1/flags/my_awesome_feature/variants \
-  -H 'Content-Type: application/json' \
-  -d '{"key": "true", "name": "True", "description": "True variant"}'
-
-curl -X POST http://localhost:8080/api/v1/flags/my_awesome_feature/variants \
-  -H 'Content-Type: application/json' \
-  -d '{"key": "false", "name": "False", "description": "False variant"}'
-```
-
-Create a `default` segment (if it does not already exist):
-
-```sh
-curl -X POST http://localhost:8080/api/v1/segments \
-  -H 'Content-Type: application/json' \
-  -d '{"key": "default", "name": "Default", "description": "Default segment for all users"}'
-```
-
-Add a targeting rule to serve the `true` variant to all users (100% rollout):
-
-```sh
-curl -X POST http://localhost:8080/api/v1/flags/my_awesome_feature/rules \
+curl -X PUT http://localhost:8080/api/v1/namespaces/default/flags/my_awesome_feature \
   -H 'Content-Type: application/json' \
   -d '{
-    "type": "multi",
-    "distributions": [{"variantKey": "true", "rollout": 100}],
-    "segmentKeys": ["default"],
-    "rank": 1
+    "name": "My Awesome Feature",
+    "description": "Demo boolean feature flag created via API",
+    "enabled": true,
+    "type": "BOOLEAN_FLAG_TYPE"
   }'
 ```
 
-> **Important:** This creates a *variant* flag, not a Boolean flag. The Go app will treat the variant value as a string ("true" or "false"). Any other value will be treated as disabled and a warning will be shown in the UI.
->
-> For true Boolean flag support (with Flipt's Boolean flag type and rollouts), use the UI as described in Option A.
+> **Note:** No variants or rules are needed for a simple Boolean flag. For advanced targeting, use the Flipt UI to add rollouts or rules.
 
 After running these commands, refresh the Go HTMX app page to see the flag status update.
 

@@ -14,10 +14,11 @@ const (
 	entityID        = "user123"
 )
 
-// Evaluate the feature flag, supporting both Boolean and variant flags
+// Evaluate the feature flag, supporting Boolean flags only
 func evaluateFeature(fliptURL string) (string, error) {
-	url := fmt.Sprintf("%s/api/v1/evaluate", fliptURL)
+	url := fmt.Sprintf("%s/evaluate/v1/boolean", fliptURL)
 	payload := map[string]interface{}{
+		"namespaceKey": "default",
 		"flagKey":  flagKey,
 		"entityId": entityID,
 		"context":  map[string]interface{}{},
@@ -39,23 +40,18 @@ func evaluateFeature(fliptURL string) (string, error) {
 		return "error", fmt.Errorf("Flipt returned non-OK status: %d", resp.StatusCode)
 	}
 
-	var result map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
+	var result struct {
+		Enabled bool   `json:"enabled"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "error", fmt.Errorf("failed to decode Flipt response: %w", err)
 	}
 
-	// Prefer 'enabled' (Boolean flag), else use 'value' (variant flag)
-	if enabled, ok := result["enabled"].(bool); ok {
-		if enabled {
-			return "true", nil
-		}
-		return "false", nil
+	if result.Enabled {
+		return "true", nil
 	}
-	if value, ok := result["value"].(string); ok {
-		return value, nil
-	}
-	return "error", fmt.Errorf("Flipt response missing 'enabled' and 'value'")
+	return "false", nil
 }
 
 // Change featureHandler to return JSON for status and color
